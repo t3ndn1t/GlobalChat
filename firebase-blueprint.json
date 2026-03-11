@@ -1,0 +1,71 @@
+{
+  "entities": {
+    "Message": {
+      "title": "Message",
+      "description": "A chat message sent by a user.",
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "The content of the message."
+        },
+        "userId": {
+          "type": "string",
+          "description": "The UID of the user who sent the message."
+        },
+        "userName": {
+          "type": "string",
+          "description": "The display name of the user."
+        },
+        "userPhoto": {
+          "type": "string",
+          "description": "The photo URL of the user."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the message was created."
+        }
+      },
+      "required": ["text", "userId", "userName", "createdAt"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile information.",
+      "type": "object",
+      "properties": {
+        "displayName": {
+          "type": "string"
+        },
+        "photoURL": {
+          "type": "string"
+        },
+        "lastSeen": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  },
+  "firestore": {
+    "/messages": {
+      "schema": "Message",
+      "description": "Global chat messages."
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles."
+    },
+    "/typing/{userId}": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "isTyping": { "type": "boolean" },
+          "userName": { "type": "string" },
+          "lastActive": { "type": "string", "format": "date-time" }
+        }
+      },
+      "description": "Real-time typing status for users."
+    }
+  }
+}

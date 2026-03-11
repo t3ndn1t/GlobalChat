@@ -1,0 +1,5 @@
+{
+  "name": "Global Chat",
+  "description": "A real-time global chat application built with React and Firebase.",
+  "requestFramePermissions": []
+}
