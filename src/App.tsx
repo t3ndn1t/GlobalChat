@@ -48,6 +48,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [signingIn, setSigningIn] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [pendingMessages, setPendingMessages] = useState<ChatMessage[]>([]);
   const [typingUsers, setTypingUsers] = useState<{id: string, userName: string}[]>([]);
@@ -114,6 +115,7 @@ export default function App() {
   const handleSignIn = async () => {
     if (signingIn) return;
     setSigningIn(true);
+    setAuthError(null);
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (error: any) {
@@ -121,6 +123,7 @@ export default function App() {
         console.log("Sign in popup was closed or preempted.");
       } else {
         console.error("Sign in error:", error);
+        setAuthError(error.message || "An error occurred during sign in.");
       }
     } finally {
       setSigningIn(false);
@@ -231,6 +234,17 @@ export default function App() {
             )}
             {signingIn ? 'Signing in...' : 'Sign in with Google'}
           </button>
+          
+          {authError && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-3 text-red-500 text-sm"
+            >
+              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              <p>{authError}</p>
+            </motion.div>
+          )}
         </motion.div>
       </div>
     );
