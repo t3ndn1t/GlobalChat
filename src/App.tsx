@@ -44,6 +44,58 @@ interface ChatMessage {
   status?: 'sending' | 'sent' | 'error';
 }
 
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string;
+    email?: string | null;
+    emailVerified?: boolean;
+    isAnonymous?: boolean;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -85,7 +137,7 @@ export default function App() {
       // Clear pending messages that have been confirmed by the server
       setPendingMessages(prev => prev.filter(p => !msgs.some(m => m.text === p.text && m.userId === p.userId)));
     }, (error) => {
-      console.error("Firestore error:", error);
+      handleFirestoreError(error, OperationType.LIST, 'messages');
     });
 
     return () => unsubscribe();
@@ -101,6 +153,8 @@ export default function App() {
         .filter(t => t.id !== user.uid && t.isTyping)
         .map(t => ({ id: t.id, userName: t.userName }));
       setTypingUsers(typing);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'typing');
     });
 
     return () => unsubscribe();
@@ -134,6 +188,7 @@ export default function App() {
 
   const updateTypingStatus = async (isTyping: boolean) => {
     if (!user) return;
+    const path = `typing/${user.uid}`;
     try {
       await setDoc(doc(db, 'typing', user.uid), {
         isTyping,
@@ -141,7 +196,7 @@ export default function App() {
         lastActive: serverTimestamp()
       }, { merge: true });
     } catch (error) {
-      console.error("Error updating typing status:", error);
+      handleFirestoreError(error, OperationType.WRITE, path);
     }
   };
 
@@ -190,7 +245,7 @@ export default function App() {
         createdAt: serverTimestamp()
       });
     } catch (error) {
-      console.error("Send error:", error);
+      handleFirestoreError(error, OperationType.CREATE, 'messages');
       setPendingMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'error' } : m));
     }
   };

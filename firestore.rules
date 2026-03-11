@@ -1,7 +1,33 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper functions
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: messages
+    // Fields:
+    //   - text: string (required, 1-1000 chars)
+    //   - userId: string (required, matches auth.uid)
+    //   - userName: string (required)
+    //   - userPhoto: string (optional)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: users
+    // Fields:
+    //   - displayName: string
+    //   - photoURL: string
+    //   - lastSeen: timestamp
+    //
+    // Collection: typing
+    // Fields:
+    //   - isTyping: boolean
+    //   - userName: string
+    //   - lastActive: timestamp
+    //
+    // ===============================================================
+
+    // Helper Functions
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -10,27 +36,43 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "infopietro09@gmail.com" && request.auth.token.email_verified == true));
+    }
+
     function isValidMessage(data) {
-      return data.text is string && data.text.size() > 0 && data.text.size() < 1000 &&
+      return data.keys().hasAll(['text', 'userId', 'userName', 'createdAt']) &&
+             data.text is string && data.text.size() > 0 && data.text.size() <= 1000 &&
              data.userId == request.auth.uid &&
+             data.userName is string && data.userName.size() <= 100 &&
+             data.createdAt == request.time;
+    }
+
+    function isValidTyping(data) {
+      return data.keys().hasAll(['isTyping', 'userName', 'lastActive']) &&
+             data.isTyping is bool &&
              data.userName is string &&
-             data.createdAt is timestamp;
+             data.lastActive == request.time;
     }
 
     match /messages/{messageId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isValidMessage(request.resource.data);
-      allow update, delete: if false; // Messages are immutable for now
+      allow update, delete: if isAdmin();
     }
 
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow write: if isOwner(userId);
+      allow create, update: if isOwner(userId) && 
+        request.resource.data.keys().hasAny(['displayName', 'photoURL', 'lastSeen']) &&
+        (!('role' in request.resource.data) || isAdmin());
     }
 
     match /typing/{userId} {
       allow read: if isAuthenticated();
-      allow write: if isOwner(userId);
+      allow write: if isOwner(userId) && isValidTyping(request.resource.data);
     }
   }
 }
